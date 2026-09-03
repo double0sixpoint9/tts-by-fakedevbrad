@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#180a2c"/><stop offset="1" stop-color="#4a125e"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe9a8"/><stop offset=".45" stop-color="#ffb038"/>
+      <stop offset="1" stop-color="#ff2e88"/>
+    </linearGradient>
+    <mask id="slice">
+      <rect width="64" height="30" fill="#fff"/>
+      <g fill="#fff">
+        <rect y="30" width="64" height="2.4"/><rect y="35" width="64" height="2.4"/>
+        <rect y="40" width="64" height="2.4"/>
+      </g>
+    </mask>
+    <clipPath id="round"><rect width="64" height="64" rx="14"/></clipPath>
+  </defs>
+  <g clip-path="url(#round)">
+    <rect width="64" height="64" fill="url(#sky)"/>
+    <circle cx="32" cy="29.5" r="16" fill="url(#sun)" mask="url(#slice)"/>
+    <g stroke="#22e0ff" stroke-width="1" opacity=".75">
+      <path d="M0 44h64M0 48.5h64M0 54h64M0 61h64"/>
+      <path d="M32 38.4 4 64M32 38.4 60 64M32 38.4 20 64M32 38.4 44 64"/>
+    </g>
+    <rect y="38" width="64" height="1.4" fill="#ff2e88"/>
+  </g>
+</svg>

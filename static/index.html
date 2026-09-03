@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TTS by fakedevbrad</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="vendor/fonts.css">
+<link rel="stylesheet" href="app.css">
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
+</head>
+<body>
+
+<!-- ── synthwave backdrop ─────────────────────────────────────────────────── -->
+<div class="backdrop" aria-hidden="true">
+  <div class="sun"></div>
+  <div class="horizon"></div>
+  <div class="grid"></div>
+</div>
+
+<!-- ── top bar ────────────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-main">TTS</span>
+    <span class="brand-sub">by fakedevbrad</span>
+  </div>
+
+  <div class="status" id="status" data-state="checking">
+    <span class="status-dot"></span>
+    <span class="status-text" id="statusText">Connecting…</span>
+  </div>
+
+  <nav class="topbar-actions">
+    <button class="ghost" id="btnContents" hidden>Contents</button>
+    <button class="ghost" id="btnSettings">Voice</button>
+    <button class="ghost" id="btnNew" hidden>New</button>
+  </nav>
+</header>
+
+<main class="stage">
+
+  <!-- ── start screen ─────────────────────────────────────────────────────── -->
+  <section class="screen screen--start" id="screenStart">
+    <div class="start-inner">
+      <div class="dropzone" id="dropzone" tabindex="0" role="button"
+           aria-label="Choose a book file">
+        <svg class="dropzone-glyph" viewBox="0 0 44 28" aria-hidden="true">
+          <g fill="currentColor">
+            <rect x="0"  y="10" width="4" height="8"  rx="2"/>
+            <rect x="8"  y="4"  width="4" height="20" rx="2"/>
+            <rect x="16" y="0"  width="4" height="28" rx="2"/>
+            <rect x="24" y="6"  width="4" height="16" rx="2"/>
+            <rect x="32" y="11" width="4" height="6"  rx="2"/>
+            <rect x="40" y="8"  width="4" height="12" rx="2"/>
+          </g>
+        </svg>
+        <h2>Drop a book here</h2>
+        <p>or click to browse</p>
+        <div class="chips"><span>PDF</span><span>EPUB</span><span>TXT</span></div>
+        <input type="file" id="fileInput" accept=".pdf,.epub,.txt" hidden>
+      </div>
+
+      <div class="or">or paste something</div>
+
+      <div class="paste">
+        <textarea id="pasteInput" rows="5"
+          placeholder="An article, an email, a chapter — anything."></textarea>
+        <div class="paste-foot">
+          <span class="hint" id="pasteHint">Ctrl + Enter to play</span>
+          <button class="primary" id="pastePlay" disabled>Read it</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── reader ───────────────────────────────────────────────────────────── -->
+  <section class="screen screen--reader" id="screenReader" hidden>
+    <div class="book-head">
+      <h1 id="bookTitle">—</h1>
+      <div class="book-meta" id="bookMeta"></div>
+    </div>
+    <div class="pane" id="pane" tabindex="0"></div>
+    <button class="follow-pill" id="followPill" hidden>↓ Follow along</button>
+  </section>
+
+  <!-- ── busy overlay ─────────────────────────────────────────────────────── -->
+  <div class="loading" id="loading" hidden>
+    <div class="loading-bars"><i></i><i></i><i></i><i></i></div>
+    <span id="loadingText">Reading your book…</span>
+  </div>
+
+</main>
+
+<!-- ── transport ──────────────────────────────────────────────────────────── -->
+<footer class="transport" id="transport" hidden>
+  <div class="transport-inner">
+    <div class="tbuttons">
+      <button class="tbtn" id="btnPrev" title="Previous (←)" aria-label="Previous">⏮</button>
+      <button class="tbtn tbtn--play" id="btnPlay" title="Play / pause (space)"
+              aria-label="Play">▶</button>
+      <button class="tbtn" id="btnNext" title="Next (→)" aria-label="Next">⏭</button>
+    </div>
+
+    <div class="tprogress">
+      <div class="track" id="track" role="slider" tabindex="0"
+           aria-label="Position in book" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="track-fill" id="trackFill"></div>
+        <div class="track-thumb" id="trackThumb"></div>
+      </div>
+      <div class="tlabels">
+        <span id="posLabel">—</span>
+        <span id="genLabel" class="gen" hidden>generating…</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- ── drawers ────────────────────────────────────────────────────────────── -->
+<div class="scrim" id="scrim" hidden></div>
+
+<aside class="drawer" id="drawerContents" hidden aria-label="Contents">
+  <div class="drawer-head">
+    <h3>Contents</h3>
+    <button class="ghost" data-close>✕</button>
+  </div>
+  <div class="toc" id="toc"></div>
+</aside>
+
+<aside class="drawer" id="drawerSettings" hidden aria-label="Voice and settings">
+  <div class="drawer-head">
+    <h3>Voice</h3>
+    <button class="ghost" data-close>✕</button>
+  </div>
+
+  <div class="voices" id="voices">
+    <p class="toc-empty">Waiting for the server…</p>
+  </div>
+
+  <div class="field">
+    <label for="speed">Speed <b id="speedVal">1.0×</b></label>
+    <input type="range" id="speed" min="0.5" max="2" step="0.1" value="1">
+  </div>
+
+  <div class="field">
+    <label for="chunk">Passage length <b id="chunkVal">120 words</b></label>
+    <input type="range" id="chunk" min="20" max="300" step="10" value="120">
+    <small>Shorter passages start faster and track your place more tightly.</small>
+  </div>
+</aside>
+
+<div class="toast" id="toast" hidden></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

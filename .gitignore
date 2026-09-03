@@ -1,0 +1,15 @@
+# Model and voices: 311 MB and 28 MB, downloaded automatically on first run.
+# GitHub rejects files over 100 MB anyway, and these are not ours to ship.
+kokoro-v1.0.onnx
+voices-v1.0.bin
+*.part
+
+# Runtime noise
+launcher.log
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# The previous version's files, which the README says are safe to delete
+_replaced/
