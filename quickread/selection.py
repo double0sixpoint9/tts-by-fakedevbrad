@@ -27,6 +27,8 @@ import ctypes
 import time
 from ctypes import wintypes
 
+from . import uia
+
 user32 = ctypes.WinDLL("user32", use_last_error=True)
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
@@ -184,11 +186,15 @@ def set_text(text: str) -> bool:
 # ── the thing this module exists for ──────────────────────────────────────────
 
 def capture(settle: float = 0.45) -> tuple[str | None, str]:
-    """Return (text, source) where source is "selection", "clipboard" or "empty".
+    """Return (text, source): where the words came from, in order of preference.
 
-    "clipboard" means the copy produced nothing and we fell back to what was
-    already there. That is the escape hatch for elevated windows -- Task Manager,
-    regedit -- which Windows forbids an ordinary process from sending input to.
+    "selection" means Ctrl+C worked, which is the common case. A "uia-" source
+    means it did not and the text was read out of the UI tree instead -- some
+    apps, Phone Link's message list among them, draw text that no copy handler
+    can reach, and SendInput cheerfully reports success while nothing happens.
+    "clipboard" is the last resort: both failed, so whatever was already copied
+    gets read. That also covers elevated windows -- Task Manager, regedit --
+    which Windows forbids an ordinary process from sending input to.
     """
     previous = get_text()
     before = user32.GetClipboardSequenceNumber()
@@ -212,6 +218,14 @@ def capture(settle: float = 0.45) -> tuple[str | None, str]:
 
     if copied and copied.strip():
         return copied, "selection"
+
+    # Nothing to copy. Ask the app for its text before giving up and reading
+    # back whatever happened to be on the clipboard, which is rarely what the
+    # user meant and is the reason this used to feel like it worked at random.
+    spoken, source = uia.capture()
+    if spoken:
+        return spoken, source
+
     if previous and previous.strip():
         return previous, "clipboard"
     return None, "empty"

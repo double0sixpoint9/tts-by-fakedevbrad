@@ -49,6 +49,18 @@ Select text in any app — Obsidian, Discord, a PDF, a browser, Word, a
 terminal — and press **Alt+Z**. It reads it aloud. No window opens and
 nothing steals focus.
 
+Some apps draw text that cannot be highlighted at all; Phone Link's messages
+are the usual example. There is nothing for Ctrl+C to copy in those, so
+QuickRead asks the app for its text instead — **point the mouse at what you
+want and press Alt+Z**. That path uses UI Automation and needs `comtypes`:
+
+```
+pip install comtypes
+```
+
+Without it every other app still works exactly as before, and only these
+unhighlightable ones stay silent.
+
 | | |
 |---|---|
 | `Alt+Z` | read the selection, replacing anything already playing |
@@ -112,6 +124,7 @@ quickread/            what QuickRead is made of
   config.py           settings file, hotkey string parsing (pure, tested)
   chunks.py           sentence-aware splitting for headless reads (pure, tested)
   selection.py        lifts the current selection via the clipboard
+  uia.py              reads text from apps the clipboard cannot reach
   session.py          starts the server, keeps it alive while speaking
   speech.py           synthesize-ahead queue, gapless playback, pause
   tray.py             Shell_NotifyIcon through ctypes: icon, menu, balloons
