@@ -36,6 +36,15 @@ BOOT_TIMEOUT = 120.0
 SPEAK_TIMEOUT = 180.0
 
 
+class PassageRejected(RuntimeError):
+    """The server understood the passage and had nothing to say for it.
+
+    A row of emoji, a rule of dashes, a block of ASCII art. Kept apart from a
+    genuine failure because the right answer is to read the next passage, not
+    to stop reading.
+    """
+
+
 def python_exe() -> str:
     """The console interpreter matching whatever is running us.
 
@@ -129,6 +138,8 @@ def speak(text: str, voice: str, speed: float) -> bytes:
             detail = json.load(error).get("error") or detail
         except (ValueError, OSError):
             pass
+        if 400 <= error.code < 500:
+            raise PassageRejected(detail) from error
         raise RuntimeError(detail) from error
     except (urllib.error.URLError, OSError) as error:
         raise RuntimeError(f"Lost the server: {error}") from error

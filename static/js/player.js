@@ -158,6 +158,15 @@ export class Player {
       }
     } catch (err) {
       if (err.name === 'AbortError' || session !== this.#session) return;
+      if (err.skippable) {
+        // Nothing to say for this passage. Read on: losing the rest of a book
+        // to a horizontal rule is much the worse failure.
+        this.#preload = null;
+        this.#inflight = null;
+        this.#on.progress?.(1);
+        this.#run(index + 1);
+        return;
+      }
       this.#setState('idle');
       this.#on.error?.(err);
       return;

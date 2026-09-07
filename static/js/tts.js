@@ -65,7 +65,12 @@ export async function speak(text, { voice, speed, signal } = {}) {
     signal,
   });
   if (!res.ok) {
-    throw new Error(`Speech failed (HTTP ${res.status}) — check the server console.`);
+    const err = new Error(`Speech failed (HTTP ${res.status}) — check the server console.`);
+    err.status = res.status;
+    // 400 is the server saying this passage holds nothing pronounceable — a
+    // rule of dashes, a row of bullets. Worth stepping over, not stopping for.
+    err.skippable = res.status === 400;
+    throw err;
   }
   return res.blob();
 }

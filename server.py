@@ -159,6 +159,114 @@ def to_wav(samples, rate: int) -> bytes:
     return buf.getvalue()
 
 
+# ── batching ────────────────────────────────────────────────────────────
+# Kokoro's context is 510 style vectors -- the voice arrays are (510, 1, 256) --
+# and _create_audio indexes voice[len(tokens)], so a batch of exactly 510
+# phonemes reads one past the end and raises. Its own batcher only breaks at
+# .,!?; so a long unpunctuated run -- a URL, a chat line, an OCR'd column, a
+# heading -- is handed over whole, truncated to exactly 510, and fails. Batching
+# happens here instead, at the one point the window and QuickRead both go
+# through, and 500 leaves room for the pad token at each end.
+
+PHONEME_LIMIT = 500
+
+CLAUSE_END = ".,!?;"
+
+
+def _clauses(phonemes: str) -> list[str]:
+    """Split at clause ends, keeping the punctuation on the piece it closed."""
+    pieces: list[str] = []
+    current = ""
+    for char in phonemes:
+        current += char
+        if char in CLAUSE_END:
+            pieces.append(current)
+            current = ""
+    if current:
+        pieces.append(current)
+    return pieces
+
+
+def _fit(clause: str, limit: int) -> list[str]:
+    """Break one over-long clause down, on word boundaries where it can."""
+    if len(clause) <= limit:
+        return [clause]
+
+    pieces: list[str] = []
+    current = ""
+    for word in clause.split(" "):
+        # A single token longer than the whole context is pathological -- one
+        # unbroken 600-character "word" -- but it still must not reach Kokoro.
+        while len(word) > limit:
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.append(word[:limit])
+            word = word[limit:]
+        if not word:
+            continue
+        candidate = f"{current} {word}" if current else word
+        if len(candidate) <= limit:
+            current = candidate
+        else:
+            pieces.append(current)
+            current = word
+    if current:
+        pieces.append(current)
+    return pieces
+
+
+def phoneme_batches(phonemes: str, limit: int = PHONEME_LIMIT) -> list[str]:
+    """Split phonemes into runs of at most `limit`, breaking as late as it can.
+
+    Prefers a clause end, falls back to a word boundary, and only cuts mid-word
+    when a single token is longer than the context. Never returns an empty
+    batch, and returns [] when there is nothing to say -- which is not an error,
+    just silence.
+    """
+    phonemes = phonemes.strip()
+    if not phonemes:
+        return []
+
+    batches: list[str] = []
+    current = ""
+    for clause in _clauses(phonemes):
+        for piece in _fit(clause, limit):
+            if not current:
+                current = piece
+            elif len(current) + len(piece) <= limit:
+                current += piece
+            else:
+                batches.append(current.strip())
+                current = piece.lstrip()
+    if current.strip():
+        batches.append(current.strip())
+
+    return [batch for batch in batches if batch]
+
+
+def synthesize(text: str, voice: str, speed: float):
+    """Text -> (samples, rate), or None when there is nothing pronounceable.
+
+    An emoji row, a rule of dashes, a block of ASCII art: Kokoro phonemizes
+    those to nothing, ends up concatenating an empty list, and raises "need at
+    least one array to concatenate". That is silence being reported as a fault,
+    and one such passage used to end the whole read.
+    """
+    import numpy as np
+
+    batches = phoneme_batches(kokoro.tokenizer.phonemize(text, "en-us"))
+    if not batches:
+        return None
+
+    parts = []
+    rate = 24000
+    for batch in batches:
+        audio, rate = kokoro.create(batch, voice=voice, speed=speed, is_phonemes=True)
+        parts.append(audio)
+    return np.concatenate(parts), rate
+
+
 # ── request handling ──────────────────────────────────────────────────────────
 
 class Handler(BaseHTTPRequestHandler):
@@ -275,12 +383,20 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             with SYNTH_LOCK:
-                samples, rate = kokoro.create(text, voice=voice, speed=speed, lang="en-us")
-            body = to_wav(samples, rate)
+                result = synthesize(text, voice, speed)
         except Exception as exc:  # noqa: BLE001 - surface any synthesis failure
             print(f"  synthesis failed: {exc}")
             self._send_json(500, {"error": str(exc)})
             return
+
+        # Distinct from a failure on purpose: the caller should move on to the
+        # next passage, not stop reading.
+        if result is None:
+            print("  nothing pronounceable - skipped")
+            self._send_json(400, {"error": "Nothing pronounceable in that passage."})
+            return
+
+        body = to_wav(*result)
 
         self._send(200, body, "audio/wav")
 

@@ -154,6 +154,14 @@ class Speaker:
             try:
                 wav = session.speak(piece, config["voice"], config["speed"])
                 samples, rate = sf.read(io.BytesIO(wav), dtype="float32")
+            except session.PassageRejected:
+                # Nothing pronounceable in this one. Losing the rest of the
+                # selection over a row of emoji is the worse failure by far.
+                with self._lock:
+                    if generation != self._generation:
+                        return
+                    self._total -= 1
+                continue
             except Exception as exc:  # noqa: BLE001 - report anything, stay alive
                 if generation == self._generation:
                     self.stop()
@@ -177,8 +185,16 @@ class Speaker:
                 return
 
         with self._lock:
-            if generation == self._generation:
-                self._synth_done = True
+            if generation != self._generation:
+                return
+            self._synth_done = True
+            silent = self._stream is None
+
+        if silent:
+            # Every passage was skipped, so no stream ever opened and nothing
+            # will fire _finished to bring us back out of WARMING.
+            self.stop()
+            self._notice("Nothing to read", "That selection had no words in it.")
 
     def _open_stream(self, rate: int, generation: int) -> None:
         with self._lock:
